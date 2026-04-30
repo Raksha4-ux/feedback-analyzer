@@ -27,11 +27,10 @@ app.post('/analyze', async (req, res) => {
         prompt: `
 You are evaluating a Fellow based on supervisor feedback.
 
-STRICT SCORING LOGIC:
-- Score 1–6 → execution only
+SCORING LOGIC:
+- Score 5 → consistent execution of assigned tasks
+- Score 6 → high-trust execution (tasks completed independently, minimal follow-up needed)
 - Score 7+ → ONLY if independent problem identification or systems building exists
-- If unclear → default to lower score
-- You MUST explain why the score is NOT higher
 
 RUBRIC LABELS (USE EXACTLY):
 1: Not Interested
@@ -56,6 +55,13 @@ REQUIREMENTS:
 - Try to map at least 1 KPI
 - Identify missing dimensions clearly
 - Be critical — not generous
+
+
+
+IMPORTANT:
+- Strong execution alone can justify a 6
+- Do NOT reduce score below 6 if the Fellow shows high reliability and ownership in execution
+- Reduce score only if execution is inconsistent or passive
 
 Return ONLY valid JSON.
 
@@ -83,15 +89,28 @@ ${transcript}
 
     console.log("OLLAMA RAW RESPONSE:", data.response);
 
-    let parsed;
+  let parsed;
 
-    try {
-      parsed = JSON.parse(data.response);
-    } catch (e) {
-      console.log("⚠️ JSON parse failed");
-      return res.json({ raw: data.response });
+try {
+
+  parsed = JSON.parse(data.response);
+} catch (e) {
+  console.log("⚠️ Direct parse failed, trying extraction...");
+
+  try {
+    // Extract JSON manually using regex
+    const match = data.response.match(/\{[\s\S]*\}/);
+    if (match) {
+      parsed = JSON.parse(match[0]);
+    } else {
+      throw new Error("No JSON found");
     }
-
+  } catch (err) {
+    console.log("❌ JSON extraction failed");
+    return res.json({ raw: data.response });
+  }
+}
+   
   
     if (!parsed.score || !parsed.evidence) {
       return res.json({
