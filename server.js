@@ -5,14 +5,18 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Test route
+// Health check
 app.get('/', (req, res) => {
   res.send('Server is running');
 });
 
-// MAIN ANALYZE ROUTE
 app.post('/analyze', async (req, res) => {
   const { transcript } = req.body;
+
+  //  Input validation
+  if (!transcript || transcript.trim().length < 10) {
+    return res.status(400).json({ error: "Transcript too short or missing" });
+  }
 
   try {
     const response = await fetch('http://127.0.0.1:11434/api/generate', {
@@ -23,12 +27,11 @@ app.post('/analyze', async (req, res) => {
         prompt: `
 You are evaluating a Fellow based on supervisor feedback.
 
-Use this logic strictly:
-
-SCORING RULE:
-- Score 1–6 → only execution (doing assigned tasks)
-- Score 7+ → ONLY if there is clear problem identification or systems building
-- Do NOT overrate helpfulness or sincerity
+STRICT SCORING LOGIC:
+- Score 1–6 → execution only
+- Score 7+ → ONLY if independent problem identification or systems building exists
+- If unclear → default to lower score
+- You MUST explain why the score is NOT higher
 
 RUBRIC LABELS (USE EXACTLY):
 1: Not Interested
@@ -42,17 +45,17 @@ RUBRIC LABELS (USE EXACTLY):
 9: Innovative and Experimental
 10: Exceptional Performer
 
-ANALYZE ON THESE DIMENSIONS:
+DIMENSIONS:
 - execution
 - systems_building
 - kpi_impact
 - change_management
 
-IMPORTANT:
-- Extract MULTIPLE quotes (2–4 minimum if possible)
-- Map at least 1 KPI if any operational impact is implied
+REQUIREMENTS:
+- Extract at least 2 quotes (if possible)
+- Try to map at least 1 KPI
 - Identify missing dimensions clearly
-- Be critical, not generous
+- Be critical — not generous
 
 Return ONLY valid JSON.
 
@@ -63,40 +66,15 @@ FORMAT:
     "label": "",
     "justification": ""
   },
-  "evidence": [
-    {
-      "quote": "",
-      "signal": "positive/negative/neutral",
-      "dimension": "",
-      "interpretation": ""
-    }
-  ],
-  "kpiMapping": [
-    {
-      "kpi": "",
-      "evidence": "",
-      "systemOrPersonal": ""
-    }
-  ],
-  "gaps": [
-    {
-      "dimension": "",
-      "detail": ""
-    }
-  ],
-  "followUpQuestions": [
-    {
-      "question": "",
-      "targetGap": "",
-      "lookingFor": ""
-    }
-  ]
+  "evidence": [],
+  "kpiMapping": [],
+  "gaps": [],
+  "followUpQuestions": []
 }
 
 Transcript:
 ${transcript}
-`
-,
+        `,
         stream: false
       })
     });
@@ -105,16 +83,24 @@ ${transcript}
 
     console.log("OLLAMA RAW RESPONSE:", data.response);
 
-  let parsed;
+    let parsed;
 
-try {
-  parsed = JSON.parse(data.response);
-} catch (e) {
-  console.log("JSON parse failed, sending raw text");
-  parsed = { raw: data.response };
-}
+    try {
+      parsed = JSON.parse(data.response);
+    } catch (e) {
+      console.log("⚠️ JSON parse failed");
+      return res.json({ raw: data.response });
+    }
 
-res.json(parsed);
+  
+    if (!parsed.score || !parsed.evidence) {
+      return res.json({
+        warning: "Incomplete structured output",
+        raw: data.response
+      });
+    }
+
+    res.json(parsed);
 
   } catch (error) {
     console.error("FULL ERROR:", error);
@@ -122,7 +108,6 @@ res.json(parsed);
   }
 });
 
-// Start server
 app.listen(3000, () => {
   console.log('Server running on http://localhost:3000');
 });
