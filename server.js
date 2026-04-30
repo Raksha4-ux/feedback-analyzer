@@ -51,10 +51,25 @@ DIMENSIONS:
 - change_management
 
 REQUIREMENTS:
-- Extract at least 2 quotes (if possible)
-- Try to map at least 1 KPI
-- Identify missing dimensions clearly
-- Be critical — not generous
+- Extract at least 2 DIRECT quotes from the transcript (no paraphrasing)
+- Quotes MUST be exact phrases from the transcript
+- Each quote must include interpretation explaining what it signals
+
+- KPI Mapping:
+  - Always attempt to map at least 1 KPI if any operational work is described
+  - Infer KPIs like:
+    - time saved → TAT
+    - complaints → Quality
+    - coordination → NPS or TAT
+
+- Gaps:
+  - MUST be specific
+  - Do NOT write "no detail"
+  - Explain what is missing and why it matters
+
+- Justification:
+  - MUST reference at least 1–2 specific actions from transcript
+  - MUST explain why score is NOT higher (especially 6 vs 7)
 
 
 
