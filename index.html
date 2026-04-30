@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Supervisor Feedback Analyzer</title>
+  <style>
+    body {
+      font-family: Arial;
+      margin: 30px;
+      background: #f9fafb;
+    }
+    h1 {
+      margin-bottom: 10px;
+    }
+    textarea {
+      width: 100%;
+      height: 180px;
+      padding: 10px;
+      margin-top: 10px;
+    }
+    button {
+      padding: 10px 20px;
+      margin-top: 10px;
+      cursor: pointer;
+    }
+    .card {
+      background: white;
+      padding: 15px;
+      margin-top: 15px;
+      border-radius: 8px;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>Supervisor Feedback Analyzer</h1>
+<p>Paste supervisor transcript below:</p>
+
+<textarea id="input"></textarea>
+<br>
+<button onclick="analyze()">Run Analysis</button>
+
+<div id="result"></div>
+
+<script>
+async function analyze() {
+  const transcript = document.getElementById('input').value;
+
+  if (!transcript.trim()) {
+    alert("Paste something first");
+    return;
+  }
+
+  const res = await fetch('http://localhost:3000/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ transcript })
+  });
+
+  const data = await res.json();
+
+  display(data);
+}
+
+function display(data) {
+  let html = '';
+
+  // Score
+  html += `
+    <div class="card">
+      <h2>Score: ${data.score.value} (${data.score.label})</h2>
+      <p>${data.score.justification}</p>
+    </div>
+  `;
+
+  // Evidence
+  html += `<div class="card"><h3>Evidence</h3>`;
+  data.evidence.forEach(e => {
+    html += `<p>• ${e.quote}</p>`;
+  });
+  html += `</div>`;
+
+  // KPIs
+  html += `<div class="card"><h3>KPI Mapping</h3>`;
+  if (data.kpiMapping.length === 0) {
+    html += `<p>No clear KPI mapping</p>`;
+  } else {
+    data.kpiMapping.forEach(k => {
+      html += `<p>• ${k.kpi}: ${k.evidence}</p>`;
+    });
+  }
+  html += `</div>`;
+
+  // Gaps
+  html += `<div class="card"><h3>Gaps</h3>`;
+  data.gaps.forEach(g => {
+    html += `<p>• ${g.dimension}: ${g.detail}</p>`;
+  });
+  html += `</div>`;
+
+  // Questions
+  html += `<div class="card"><h3>Follow-up Questions</h3>`;
+  data.followUpQuestions.forEach(q => {
+    html += `<p>• ${q.question}</p>`;
+  });
+  html += `</div>`;
+
+  document.getElementById('result').innerHTML = html;
+}
+</script>
+
+</body>
+</html>
