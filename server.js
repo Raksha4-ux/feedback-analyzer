@@ -74,9 +74,11 @@ REQUIREMENTS:
 
 
 IMPORTANT:
-- Strong execution alone can justify a 6
-- Do NOT reduce score below 6 if the Fellow shows high reliability and ownership in execution
-- Reduce score only if execution is inconsistent or passive
+- Return ONLY pure JSON
+- Do NOT include any text before or after JSON
+- Do NOT include markdown formatting like triple backticks
+- Ensure JSON is valid and parseable
+- All string values MUST be enclosed in double quotes
 
 Return ONLY valid JSON.
 
@@ -103,28 +105,70 @@ ${transcript}
     const data = await response.json();
 
     console.log("OLLAMA RAW RESPONSE:", data.response);
-
-  let parsed;
+let parsed;
 
 try {
+  let cleaned = data.response
+    .replace(/```json/g, '')
+    .replace(/```/g, '')
+    .trim();
 
-  parsed = JSON.parse(data.response);
-} catch (e) {
-  console.log("⚠️ Direct parse failed, trying extraction...");
-
+  // Try normal parse first
   try {
-    // Extract JSON manually using regex
-    const match = data.response.match(/\{[\s\S]*\}/);
-    if (match) {
-      parsed = JSON.parse(match[0]);
-    } else {
-      throw new Error("No JSON found");
-    }
-  } catch (err) {
-    console.log("❌ JSON extraction failed");
-    return res.json({ raw: data.response });
+    parsed = JSON.parse(cleaned);
+  } catch {
+    console.log("⚠️ Attempting recovery...");
+
+    // Try extracting JSON block
+    const match = cleaned.match(/\{[\s\S]*/);
+
+    if (!match) throw new Error("No JSON found");
+
+    let partial = match[0];
+
+    // 🔥 Fix common truncation issues
+    // Close open quotes
+    partial = partial.replace(/"([^"]*)$/, '"$1"');
+
+    // Close missing brackets/braces
+    const openBraces = (partial.match(/{/g) || []).length;
+    const closeBraces = (partial.match(/}/g) || []).length;
+
+    const openBrackets = (partial.match(/\[/g) || []).length;
+    const closeBrackets = (partial.match(/\]/g) || []).length;
+
+    partial += '}'.repeat(openBraces - closeBraces);
+    partial += ']'.repeat(openBrackets - closeBrackets);
+
+    parsed = JSON.parse(partial);
   }
+
+} catch (err) {
+  console.log("❌ Final parsing failed");
+  return res.json({ raw: data.response });
 }
+
+//   let parsed;
+
+// try {
+
+//   parsed = JSON.parse(data.response);
+// } catch (e) {
+//   console.log("⚠️ Direct parse failed, trying extraction...");
+
+//   try {
+//     // Extract JSON manually using regex
+//     const match = data.response.match(/\{[\s\S]*\}/);
+//     if (match) {
+//       parsed = JSON.parse(match[0]);
+//     } else {
+//       throw new Error("No JSON found");
+//     }
+//   } catch (err) {
+//     console.log("❌ JSON extraction failed");
+//     return res.json({ raw: data.response });
+//   }
+// }
    
   
     if (!parsed.score || !parsed.evidence) {
