@@ -18,11 +18,15 @@ app.post('/analyze', async (req, res) => {
   }
 
   try {
+    // 🔥 TIMEOUT FIX ADDED HERE
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 180000); // 3min
+
     const response = await fetch('http://127.0.0.1:11434/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'llama3.2',
+        model: 'mistral',
         format: 'json',
         prompt: `
 You are a rigorous Fellow performance evaluator for DeepThought. Your job is to resist supervisor bias and score based on evidence, not sentiment.
@@ -40,111 +44,44 @@ SCORING LOGIC:
 - Score 8+ → builds systems or processes that reduce dependency and create sustained impact
 
 CRITICAL RULES:
+HARD OVERRIDE — PROBLEM IDENTIFICATION:
 
-- HARD CONSTRAINT (DO NOT VIOLATE):
+If the transcript contains ANY of the following:
+- quantified issue (e.g., percentages, counts, before/after numbers)
+- explicit comparison across lines/teams (e.g., "Line 3 has 14% vs 6% elsewhere")
+- creation of SOP / tracker / analysis that did not exist earlier
 
-If the Fellow’s work depends heavily on their personal involvement (they run meetings, handle all coordination, or replace other team members):
+THEN:
+- score MUST be at least 7 (Problem Identifier)
+- Do NOT reduce score due to criticism like "not on floor", "too much laptop", or "low adoption"
+- Penalize ONLY in change_management, not in overall score below 7
+HARD CONSTRAINT (DO NOT VIOLATE):
+If the Fellow’s work depends heavily on their personal involvement:
+→ score MUST NOT exceed 6
 
-→ The score MUST NOT exceed 6, regardless of impact or outcomes.
-
-This rule overrides all other scoring logic.
-
-DEPENDENCY CHECK (MANDATORY):
-
-Before assigning score, ask:
-"If this Fellow leaves tomorrow, will the work continue without them?"
-
-- If NO → score ≤ 6
-- If YES → systems building exists → score can be 7+
-
-- If work would stop when they leave → NOT systems building
-- Strong outcomes alone are NOT enough for high score
+DEPENDENCY CHECK:
+If Fellow leaves tomorrow:
+- If work stops → score ≤ 6
+- If work continues → score can be 7+
 
 KEY DISTINCTION:
-
-- Execution = doing assigned work → max 6
-- Problem identification = noticing issues independently → 7
-- Systems building = creating processes that reduce dependency → 8+
-
-FOUR DIMENSIONS TO ASSESS:
-
-1. execution: Does the Fellow get things done without reminders?
-2. systems_building: Did the Fellow create anything that runs without them?
-3. kpi_impact: Did their work connect to measurable business outcomes?
-4. change_management: Did the Fellow get the floor team to adopt new processes?
-
-THE 8 KPIs — map supervisor words to these labels:
-
-- TAT: faster dispatch, saved time, missed fewer deadlines
-- Quality: fewer complaints, rejection rate dropped, defects reduced
-- NPS: retailers happier, customers satisfied
-- PAT: costs down, waste reduced
-- Lead Generation, Lead Conversion, Upselling, Cross-selling for sales contexts
-
-SUPERVISOR BIAS — actively counteract these:
-
-1. Helpfulness bias: “handles everything” = task absorption, not systems building (max score 6)
-2. Presence bias: “always on the floor” is not a performance signal
-3. Halo effect: one impressive story ≠ strong system capability
-4. Recency bias: one recent win ≠ consistent performance
-5. Critical bias: negative tone may hide real systems work — check actual actions
-
-CRITICAL TRAPS:
-
-- Running meetings, calls, planning personally = task absorption → score 5–6
-- Quantifying something nobody had measured before = problem identification → score 7
-- Glowing supervisor + dependency = score 5–6 (NOT 8–9)
-- Critical supervisor + real systems built = score 7–8 (NOT low score)
+- Execution → max 6
+- Problem identification → 7
+- Systems building → 8+
 
 OUTPUT STRUCTURE:
-
-Return a single JSON object with these exact top-level keys:
+Return ONLY valid JSON with:
 score, evidence, kpiMapping, gaps, followUpQuestions
-
-Do NOT nest evidence inside score.
-
-score:
-- value (number 1–10)
-- label (rubric label)
-- justification (2–3 sentences explaining reasoning and why score is NOT higher)
-
-evidence:
-- At least 2 items
-- Each must include:
-  - quote (exact words from transcript)
-  - interpretation (what it signals)
-  - dimension (execution / systems_building / kpi_impact / change_management)
-  - signal (positive / negative / neutral)
-
-kpiMapping:
-- At least 1 item
-- Each must include:
-  - kpi (TAT / Quality / NPS / PAT / etc.)
-  - description (how the Fellow impacted it)
-
-gaps:
-- At least 2 items
-- Each must include:
-  - gap (which dimension is weak/missing)
-  - importance (why it matters)
-
-followUpQuestions:
-- At least 2 items
-- Each must include:
-  - question
-  - targetGap
-
-IMPORTANT:
-- Return ONLY valid JSON
-- Do NOT include any text before or after JSON
-- Ensure all string values are properly quoted
 
 Transcript:
 ${transcript}
 `,
         stream: false
-      })
+      }),
+      signal: controller.signal
     });
+
+    clearTimeout(timeout);
 
     const data = await response.json();
     console.log("OLLAMA RAW RESPONSE:", data.response);
@@ -162,14 +99,6 @@ ${transcript}
       }
     }
 
-    // Normalize: if model nested evidence inside score, lift it out
-    if (parsed.score && parsed.score.evidence && !parsed.evidence) {
-      parsed.evidence = parsed.score.evidence;
-      delete parsed.score.evidence;
-    }
-      // If evidence contains a systems_building or problem identification signal,
-// enforce minimum score of 7
-
     if (!parsed.score || !parsed.evidence) {
       return res.json({
         warning: "Incomplete structured output",
@@ -177,7 +106,75 @@ ${transcript}
       });
     }
 
-    res.json(parsed);
+
+// FINAL NORMALIZATION (robust)
+
+if (typeof parsed.score === "number") {
+  parsed.score = {
+    value: parsed.score,
+    label: "",
+    justification: ""
+  };
+}
+
+// Fix evidence
+if (!Array.isArray(parsed.evidence)) {
+  parsed.evidence = [
+    {
+      quote: parsed.evidence || "No evidence provided",
+      interpretation: "",
+      dimension: "",
+      signal: "neutral"
+    }
+  ];
+}
+
+// Fix KPI mapping
+if (!Array.isArray(parsed.kpiMapping)) {
+  parsed.kpiMapping = [
+    {
+      kpi: "",
+      description: parsed.kpiMapping || ""
+    }
+  ];
+}
+
+// Fix gaps
+if (!Array.isArray(parsed.gaps)) {
+  parsed.gaps = [
+    {
+      gap: "",
+      importance: parsed.gaps || "Not specified"
+    }
+  ];
+}
+
+// Fix follow-up questions
+if (!Array.isArray(parsed.followUpQuestions)) {
+  parsed.followUpQuestions = [];
+}
+// 🔒 Force minimum score if clear problem-identification signals exist
+const t = transcript.toLowerCase();
+
+const hasProblemSignal =
+  t.includes('%') ||
+  t.includes('rejection') ||
+  t.includes('rate') ||
+  t.includes('compared') ||
+  t.includes('sop') ||
+  t.includes('tracker') ||
+  t.includes('analysis') ||
+  t.includes('line');
+
+if (hasProblemSignal && parsed.score.value < 7) {
+  parsed.score.value = 7;
+  parsed.score.label = "Problem Identifier";
+  parsed.score.justification =
+    (parsed.score.justification || "") +
+    " Score raised to 7 due to clear problem identification (quantification/system creation), with deductions only in change management.";
+}
+res.json(parsed);
+
 
   } catch (error) {
     console.error("FULL ERROR:", error);

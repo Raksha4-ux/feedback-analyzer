@@ -352,6 +352,108 @@ function display(data) {
     return;
   }
 
+  const v = Number(data.score.value || data.score);
+  const sc = v <= 4 ? 's-low' : v <= 6 ? 's-mid' : 's-high';
+
+  // 🔥 NORMALIZE EVERYTHING HERE
+  const evidence = Array.isArray(data.evidence)
+    ? data.evidence
+    : [{ quote: data.evidence || '', interpretation: '' }];
+
+  const kpis = Array.isArray(data.kpiMapping)
+    ? data.kpiMapping
+    : (data.kpiMapping ? [data.kpiMapping] : []);
+
+  const gaps = Array.isArray(data.gaps)
+    ? data.gaps
+    : (data.gaps ? [{ gap: data.gaps, importance: '' }] : []);
+
+  const qs = Array.isArray(data.followUpQuestions)
+    ? data.followUpQuestions
+    : [];
+
+  let h = `
+    <div class="score-block">
+      <div class="score-badge ${sc}">
+        <span class="num">${v}</span>
+        <span class="den">/ 10</span>
+      </div>
+      <div class="score-info">
+        <h2>${data.score.label || ''}</h2>
+        <p>${data.score.justification || ''}</p>
+      </div>
+    </div>`;
+
+  // Evidence
+  h += `<div class="section"><div class="sec-title">Evidence — accept or reject each finding</div>`;
+  evidence.forEach((e, i) => {
+    const q = e.quote || e.text || e;
+    const interp = e.interpretation || '';
+    h += `<div class="ev-item" id="ev-${i}">
+      <div class="ev-quote">"${q}"</div>
+      <div class="ev-interp">${interp}</div>
+      <div class="ev-actions">
+        <button class="btn-a" onclick="mark(${i},'accepted')">Accept</button>
+        <button class="btn-r" onclick="mark(${i},'rejected')">Reject</button>
+      </div>
+    </div>`;
+  });
+  h += `</div>`;
+
+  // KPI
+  h += `<div class="section"><div class="sec-title">KPI Mapping</div>`;
+  if (!kpis.length) {
+    h += `<div class="kpi-item"><span class="kpi-desc">No KPI mapping extracted</span></div>`;
+  } else {
+    kpis.forEach(k => {
+      const label = k.kpi || k.KPI || 'KPI';
+      const desc  = k.description || k.evidence || k.mapping || JSON.stringify(k);
+      h += `<div class="kpi-item">
+        <span class="kpi-tag">${label}</span>
+        <span class="kpi-desc">${desc}</span>
+      </div>`;
+    });
+  }
+  h += `</div>`;
+
+  // Gaps
+  h += `<div class="section"><div class="sec-title">Gaps</div>`;
+  if (!gaps.length) {
+    h += `<div class="gap-item"><div class="gap-why">No gaps identified</div></div>`;
+  } else {
+    gaps.forEach(g => {
+      const name = g.gap || g.dimension || g.description || 'Unknown';
+      const detail = g.importance || g.justification || '';
+      h += `<div class="gap-item">
+        <div class="gap-name">${name}</div>
+        <div class="gap-why">${detail}</div>
+      </div>`;
+    });
+  }
+  h += `</div>`;
+
+  // Questions
+  h += `<div class="section"><div class="sec-title">Suggested Follow-up Questions</div>`;
+  if (!qs.length) {
+    h += `<div class="fq-item">No follow-up questions generated</div>`;
+  } else {
+    qs.forEach((q, i) => {
+      const txt = typeof q === 'string' ? q : (q.question || '');
+      h += `<div class="fq-item">
+        <span class="fq-num">Q${i + 1}</span>
+        <span>${txt}</span>
+      </div>`;
+    });
+  }
+  h += `</div>`;
+
+  document.getElementById('result').innerHTML = h;
+}
+  if (!data || !data.score) {
+    document.getElementById('result').innerHTML = '<div class="empty-state">Invalid response — check console</div>';
+    return;
+  }
+
   const v = Number(data.score.value);
   const sc = v <= 4 ? 's-low' : v <= 6 ? 's-mid' : 's-high';
 
