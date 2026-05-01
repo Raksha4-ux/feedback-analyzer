@@ -1,11 +1,11 @@
 const express = require('express');
 const cors = require('cors');
+const { jsonrepair } = require('jsonrepair');
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Health check
 app.get('/', (req, res) => {
   res.send('Server is running');
 });
@@ -13,7 +13,6 @@ app.get('/', (req, res) => {
 app.post('/analyze', async (req, res) => {
   const { transcript } = req.body;
 
-  //  Input validation
   if (!transcript || transcript.trim().length < 10) {
     return res.status(400).json({ error: "Transcript too short or missing" });
   }
@@ -24,6 +23,7 @@ app.post('/analyze', async (req, res) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         model: 'llama3.2',
+        format: 'json',   
         prompt: `
 You are evaluating a Fellow based on supervisor feedback.
 
@@ -68,31 +68,47 @@ REQUIREMENTS:
   - Explain what is missing and why it matters
 
 - Justification:
-  - MUST reference at least 1–2 specific actions from transcript
+  - MUST reference at least 1-2 specific actions from transcript
   - MUST explain why score is NOT higher (especially 6 vs 7)
-
-
 
 IMPORTANT:
 - Return ONLY pure JSON
 - Do NOT include any text before or after JSON
 - Do NOT include markdown formatting like triple backticks
 - Ensure JSON is valid and parseable
-- All string values MUST be enclosed in double quotes
+- ALL string values MUST be enclosed in double quotes
+- Do NOT leave any value unquoted
 
-Return ONLY valid JSON.
-
-FORMAT:
+Return ONLY valid JSON in this exact format:
 {
   "score": {
     "value": number,
     "label": "",
     "justification": ""
   },
-  "evidence": [],
-  "kpiMapping": [],
-  "gaps": [],
-  "followUpQuestions": []
+  "evidence": [
+    {
+      "quote": "",
+      "interpretation": ""
+    }
+  ],
+  "kpiMapping": [
+    {
+      "kpi": "",
+      "description": ""
+    }
+  ],
+  "gaps": [
+    {
+      "gap": "",
+      "importance": ""
+    }
+  ],
+  "followUpQuestions": [
+    {
+      "question": ""
+    }
+  ]
 }
 
 Transcript:
@@ -103,74 +119,16 @@ ${transcript}
     });
 
     const data = await response.json();
-
     console.log("OLLAMA RAW RESPONSE:", data.response);
-let parsed;
 
+   let parsed;
 try {
-  let cleaned = data.response
-    .replace(/```json/g, '')
-    .replace(/```/g, '')
-    .trim();
-
-  // Try normal parse first
-  try {
-    parsed = JSON.parse(cleaned);
-  } catch {
-    console.log("⚠️ Attempting recovery...");
-
-    // Try extracting JSON block
-    const match = cleaned.match(/\{[\s\S]*/);
-
-    if (!match) throw new Error("No JSON found");
-
-    let partial = match[0];
-
-    // 🔥 Fix common truncation issues
-    // Close open quotes
-    partial = partial.replace(/"([^"]*)$/, '"$1"');
-
-    // Close missing brackets/braces
-    const openBraces = (partial.match(/{/g) || []).length;
-    const closeBraces = (partial.match(/}/g) || []).length;
-
-    const openBrackets = (partial.match(/\[/g) || []).length;
-    const closeBrackets = (partial.match(/\]/g) || []).length;
-
-    partial += '}'.repeat(openBraces - closeBraces);
-    partial += ']'.repeat(openBrackets - closeBrackets);
-
-    parsed = JSON.parse(partial);
-  }
-
+  parsed = JSON.parse(data.response);
 } catch (err) {
-  console.log("❌ Final parsing failed");
+  console.log("❌ Parse failed:", err.message);
   return res.json({ raw: data.response });
 }
 
-//   let parsed;
-
-// try {
-
-//   parsed = JSON.parse(data.response);
-// } catch (e) {
-//   console.log("⚠️ Direct parse failed, trying extraction...");
-
-//   try {
-//     // Extract JSON manually using regex
-//     const match = data.response.match(/\{[\s\S]*\}/);
-//     if (match) {
-//       parsed = JSON.parse(match[0]);
-//     } else {
-//       throw new Error("No JSON found");
-//     }
-//   } catch (err) {
-//     console.log("❌ JSON extraction failed");
-//     return res.json({ raw: data.response });
-//   }
-// }
-   
-  
     if (!parsed.score || !parsed.evidence) {
       return res.json({
         warning: "Incomplete structured output",

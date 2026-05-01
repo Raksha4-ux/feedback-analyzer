@@ -8,20 +8,24 @@
       margin: 30px;
       background: #f9fafb;
     }
+
     h1 {
       margin-bottom: 10px;
     }
+
     textarea {
       width: 100%;
       height: 180px;
       padding: 10px;
       margin-top: 10px;
     }
+
     button {
       padding: 10px 20px;
       margin-top: 10px;
       cursor: pointer;
     }
+
     .card {
       background: white;
       padding: 15px;
@@ -29,19 +33,36 @@
       border-radius: 8px;
       box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
+
+    .container {
+      display: flex;
+      gap: 20px;
+    }
+
+    .left, .right {
+      width: 50%;
+    }
   </style>
 </head>
 
 <body>
 
 <h1>Supervisor Feedback Analyzer</h1>
-<p>Paste supervisor transcript below:</p>
 
-<textarea id="input"></textarea>
-<br>
-<button onclick="analyze()">Run Analysis</button>
+<div class="container">
 
-<div id="result"></div>
+  <!-- LEFT: INPUT -->
+  <div class="left">
+    <p>Paste transcript:</p>
+    <textarea id="input"></textarea>
+    <br>
+    <button onclick="analyze()">Run Analysis</button>
+  </div>
+
+  <!-- RIGHT: OUTPUT -->
+  <div class="right" id="result"></div>
+
+</div>
 
 <script>
 async function analyze() {
@@ -52,58 +73,87 @@ async function analyze() {
     return;
   }
 
-  const res = await fetch('http://localhost:3000/analyze', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ transcript })
-  });
+  try {
+    const res = await fetch('http://localhost:3000/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ transcript })
+    });
 
-  const data = await res.json();
+    const data = await res.json();
+    display(data);
 
-  display(data);
+  } catch (err) {
+    console.error(err);
+    document.getElementById('result').innerHTML = "❌ Error connecting to backend";
+  }
 }
 
 function display(data) {
+
+  if (!data || !data.score) {
+    document.getElementById('result').innerHTML = "⚠️ Invalid response from AI";
+    return;
+  }
+
   let html = '';
 
-  // Score
+  // SCORE
   html += `
     <div class="card">
       <h2>Score: ${data.score.value} (${data.score.label})</h2>
-      <p>${data.score.justification}</p>
+      <p>${data.score.justification || ""}</p>
     </div>
   `;
 
-  // Evidence
+  // EVIDENCE
   html += `<div class="card"><h3>Evidence</h3>`;
-  data.evidence.forEach(e => {
-    html += `<p>• ${e.quote}</p>`;
-  });
-  html += `</div>`;
-
-  // KPIs
-  html += `<div class="card"><h3>KPI Mapping</h3>`;
-  if (data.kpiMapping.length === 0) {
-    html += `<p>No clear KPI mapping</p>`;
-  } else {
-    data.kpiMapping.forEach(k => {
-      html += `<p>• ${k.kpi}: ${k.evidence}</p>`;
+  if (data.evidence && data.evidence.length > 0) {
+    (data.evidence || []).forEach(e => {
+      const quote = e.quote || e.text || "No quote";
+      const interp = e.interpretation || "";
+      html += `<p><strong>"${quote}"</strong><br><em>${interp}</em></p>`;
     });
+  } else {
+    html += `<p>No evidence extracted</p>`;
   }
   html += `</div>`;
 
-  // Gaps
-  html += `<div class="card"><h3>Gaps</h3>`;
-  data.gaps.forEach(g => {
-    html += `<p>• ${g.dimension}: ${g.detail}</p>`;
-  });
+  // KPI MAPPING
+  html += `<div class="card"><h3>KPI Mapping</h3>`;
+  if (data.kpiMapping && data.kpiMapping.length > 0) {
+   (data.kpiMapping || []).forEach(k => {
+  const label = k.kpi || k.KPI || k.kpi_name || "Unknown";
+  const detail = k.description || k.evidence || k.mapping || k.TAT || k.value || "No detail";
+  html += `<p>• <strong>${label}</strong>: ${detail}</p>`;
+});
+  } else {
+    html += `<p>No clear KPI mapping</p>`;
+  }
   html += `</div>`;
 
-  // Questions
+  // GAPS
+  html += `<div class="card"><h3>Gaps</h3>`;
+  if (data.gaps && data.gaps.length > 0) {
+    (data.gaps || []).forEach(g => {
+      const label = g.gap || g.dimension || g.description || "Unknown";
+      const detail = g.justification || g.importance || g.significance || g.detail || "No detail";
+      html += `<p>• <strong>${label}</strong>: ${detail}</p>`;
+    });
+  } else {
+    html += `<p>No gaps identified</p>`;
+  }
+  html += `</div>`;
+
+  // FOLLOW-UP QUESTIONS
   html += `<div class="card"><h3>Follow-up Questions</h3>`;
-  data.followUpQuestions.forEach(q => {
-    html += `<p>• ${q.question}</p>`;
-  });
+  if (data.followUpQuestions && data.followUpQuestions.length > 0) {
+    (data.followUpQuestions || []).forEach(q => {
+      html += `<p>• ${q.question || q || "No question"}</p>`;
+    });
+  } else {
+    html += `<p>No follow-up questions</p>`;
+  }
   html += `</div>`;
 
   document.getElementById('result').innerHTML = html;
