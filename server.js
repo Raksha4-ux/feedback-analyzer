@@ -32,24 +32,49 @@ RUBRIC:
 4: Careless and Inconsistent | 5: Consistent Performer | 6: Reliable and Productive
 7: Problem Identifier | 8: Problem Solver | 9: Innovative and Experimental | 10: Exceptional Performer
 
-SCORING RULES:
-- Score 5: does assigned tasks reliably
-- Score 6: high trust, minimal follow-up needed, supervisor can give and forget
-- Score 7+: ONLY if Fellow identified a problem the supervisor had NOT already articulated
-- The difference between 6 and 7 is WHO defines the problem. A 6 solves problems given to them. A 7 finds problems nobody asked them to find.
+SCORING LOGIC:
 
-THE SURVIVABILITY TEST — apply to every transcript:
-Ask: If this Fellow left tomorrow, what would keep running on its own?
-- If the answer is nothing, that is a systems_building gap and score cannot exceed 6.
-- If the answer is a tracker, SOP, or process they built, that is systems_building evidence.
+- Score 5 → executes assigned tasks consistently
+- Score 6 → reliable, high-trust execution, handles responsibilities independently
+- Score 7 → identifies problems or introduces improvements beyond assigned tasks
+- Score 8+ → builds systems or processes that reduce dependency and create sustained impact
+
+CRITICAL RULES:
+
+- HARD CONSTRAINT (DO NOT VIOLATE):
+
+If the Fellow’s work depends heavily on their personal involvement (they run meetings, handle all coordination, or replace other team members):
+
+→ The score MUST NOT exceed 6, regardless of impact or outcomes.
+
+This rule overrides all other scoring logic.
+
+DEPENDENCY CHECK (MANDATORY):
+
+Before assigning score, ask:
+"If this Fellow leaves tomorrow, will the work continue without them?"
+
+- If NO → score ≤ 6
+- If YES → systems building exists → score can be 7+
+
+- If work would stop when they leave → NOT systems building
+- Strong outcomes alone are NOT enough for high score
+
+KEY DISTINCTION:
+
+- Execution = doing assigned work → max 6
+- Problem identification = noticing issues independently → 7
+- Systems building = creating processes that reduce dependency → 8+
 
 FOUR DIMENSIONS TO ASSESS:
+
 1. execution: Does the Fellow get things done without reminders?
 2. systems_building: Did the Fellow create anything that runs without them?
 3. kpi_impact: Did their work connect to measurable business outcomes?
 4. change_management: Did the Fellow get the floor team to adopt new processes?
 
 THE 8 KPIs — map supervisor words to these labels:
+
 - TAT: faster dispatch, saved time, missed fewer deadlines
 - Quality: fewer complaints, rejection rate dropped, defects reduced
 - NPS: retailers happier, customers satisfied
@@ -57,31 +82,62 @@ THE 8 KPIs — map supervisor words to these labels:
 - Lead Generation, Lead Conversion, Upselling, Cross-selling for sales contexts
 
 SUPERVISOR BIAS — actively counteract these:
-1. Helpfulness bias: She handles all my calls now = task absorption, not systems building. Score max 6.
-2. Presence bias: Always on the floor is not a performance signal. Ignore it.
-3. Halo effect: One impressive personal crisis story does not prove systems building.
-4. Recency bias: One recent win does not override a pattern of task execution.
-5. Critical bias: Supervisor complaints about too much laptop time may mask real systems work. Look at what was actually built.
+
+1. Helpfulness bias: “handles everything” = task absorption, not systems building (max score 6)
+2. Presence bias: “always on the floor” is not a performance signal
+3. Halo effect: one impressive story ≠ strong system capability
+4. Recency bias: one recent win ≠ consistent performance
+5. Critical bias: negative tone may hide real systems work — check actual actions
 
 CRITICAL TRAPS:
-- Fellow personally running meetings, calls, and planning = task absorption. Score 5-6.
-- Fellow who quantifies something nobody had measured before = problem identification. Score 7.
-- Glowing supervisor but describes personal dependency = score 5-6, not 8-9.
-- Critical supervisor but describes real systems built = score 7-8, not 4.
+
+- Running meetings, calls, planning personally = task absorption → score 5–6
+- Quantifying something nobody had measured before = problem identification → score 7
+- Glowing supervisor + dependency = score 5–6 (NOT 8–9)
+- Critical supervisor + real systems built = score 7–8 (NOT low score)
 
 OUTPUT STRUCTURE:
-Return a single JSON object with these exact top-level keys: score, evidence, kpiMapping, gaps, followUpQuestions.
+
+Return a single JSON object with these exact top-level keys:
+score, evidence, kpiMapping, gaps, followUpQuestions
+
 Do NOT nest evidence inside score.
 
-score is an object with: value (number 1-10), label (rubric label), justification (2-3 sentences citing specific transcript actions and explaining why score is not higher).
+score:
+- value (number 1–10)
+- label (rubric label)
+- justification (2–3 sentences explaining reasoning and why score is NOT higher)
 
-evidence is an array of at least 2 objects. Each object has: quote (exact words from transcript), interpretation (what it signals about the Fellow), dimension (one of: execution, systems_building, kpi_impact, change_management), signal (one of: positive, negative, neutral).
+evidence:
+- At least 2 items
+- Each must include:
+  - quote (exact words from transcript)
+  - interpretation (what it signals)
+  - dimension (execution / systems_building / kpi_impact / change_management)
+  - signal (positive / negative / neutral)
 
-kpiMapping is an array of at least 1 object. Each object has: kpi (one of: TAT, Quality, NPS, PAT, Lead Generation, Lead Conversion, Upselling, Cross-selling), description (what the Fellow did that connects to this KPI).
+kpiMapping:
+- At least 1 item
+- Each must include:
+  - kpi (TAT / Quality / NPS / PAT / etc.)
+  - description (how the Fellow impacted it)
 
-gaps is an array of at least 2 objects. Each object has: gap (which dimension is missing or weak), importance (why it matters for this Fellow).
+gaps:
+- At least 2 items
+- Each must include:
+  - gap (which dimension is weak/missing)
+  - importance (why it matters)
 
-followUpQuestions is an array of at least 2 objects. Each object has: question (what to ask the supervisor next), targetGap (which gap this addresses).
+followUpQuestions:
+- At least 2 items
+- Each must include:
+  - question
+  - targetGap
+
+IMPORTANT:
+- Return ONLY valid JSON
+- Do NOT include any text before or after JSON
+- Ensure all string values are properly quoted
 
 Transcript:
 ${transcript}
@@ -113,17 +169,7 @@ ${transcript}
     }
       // If evidence contains a systems_building or problem identification signal,
 // enforce minimum score of 7
-const hasLevel7Signal = (parsed.evidence || []).some(e =>
-  e.dimension === 'systems_building' && e.signal === 'positive' ||
-  (e.quote && e.quote.toLowerCase().includes('nobody')) ||
-  (e.interpretation && e.interpretation.toLowerCase().includes('problem identif'))
-);
 
-if (hasLevel7Signal && parsed.score.value < 7) {
-  parsed.score.value = 7;
-  parsed.score.label = 'Problem Identifier';
-  parsed.score.justification += ' Score adjusted to 7: evidence of independent problem identification detected.';
-}
     if (!parsed.score || !parsed.evidence) {
       return res.json({
         warning: "Incomplete structured output",
