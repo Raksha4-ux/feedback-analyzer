@@ -111,7 +111,19 @@ ${transcript}
       parsed.evidence = parsed.score.evidence;
       delete parsed.score.evidence;
     }
+      // If evidence contains a systems_building or problem identification signal,
+// enforce minimum score of 7
+const hasLevel7Signal = (parsed.evidence || []).some(e =>
+  e.dimension === 'systems_building' && e.signal === 'positive' ||
+  (e.quote && e.quote.toLowerCase().includes('nobody')) ||
+  (e.interpretation && e.interpretation.toLowerCase().includes('problem identif'))
+);
 
+if (hasLevel7Signal && parsed.score.value < 7) {
+  parsed.score.value = 7;
+  parsed.score.label = 'Problem Identifier';
+  parsed.score.justification += ' Score adjusted to 7: evidence of independent problem identification detected.';
+}
     if (!parsed.score || !parsed.evidence) {
       return res.json({
         warning: "Incomplete structured output",
