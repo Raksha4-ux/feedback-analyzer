@@ -1,44 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Trinethra — Fellow Evaluation</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;1,400&family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    /* --- KEEPING YOUR CSS EXACTLY SAME --- */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f4f3ef;
+      --surface: #ffffff;
+      --border: #e0ded8;
+      --text: #1a1917;
+      --muted: #6b6963;
+      --accept-bg: #eaf3de;
+      --accept-text: #3b6d11;
+      --accept-border: #c0dd97;
+      --reject-bg: #fcebeb;
+      --reject-text: #a32d2d;
+      --reject-border: #f7c1c1;
+      --tag-bg: #f0efe9;
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 16px 28px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    header h1 {
+      font-size: 16px;
+      font-weight: 600;
+      font-family: 'Fraunces', serif;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      height: calc(100vh - 53px);
+    }
+
+    .left-panel {
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      background: var(--surface);
+    }
+
+    .panel-label {
+      padding: 12px 20px;
+      border-bottom: 1px solid var(--border);
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--muted);
+    }
+
+    textarea {
+      flex: 1;
+      border: none;
+      outline: none;
+      resize: none;
+      padding: 18px 20px;
+      font-family: 'DM Mono', monospace;
+      font-size: 12.5px;
+    }
+
+    .left-footer {
+      padding: 12px 20px;
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 12px;
+    }
+
+    .run-btn {
+      background: var(--text);
+      color: #fff;
+      border: none;
+      padding: 8px 18px;
+      cursor: pointer;
+    }
+
+    .right-panel {
+      overflow-y: auto;
+      background: var(--bg);
+      padding-bottom: 24px;
+    }
+
+    .empty-state {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #b0aea8;
+    }
+
+    .score-block { margin: 18px; background: #fff; padding: 18px; display: flex; gap: 18px; }
+    .score-badge { width: 68px; height: 68px; display:flex; align-items:center; justify-content:center; flex-direction:column; }
+    .score-badge .num { font-size: 30px; }
+    .score-badge .den { font-size: 11px; }
+
+    .s-low  { background: #fcebeb; }
+    .s-mid  { background: #faeeda; }
+    .s-high { background: #eaf3de; }
+
+    .section { margin: 10px 18px; background:#fff; }
+    .sec-title { padding: 10px; font-size: 11px; color: var(--muted); }
+
+    .ev-item, .kpi-item, .gap-item, .fq-item {
+      padding: 10px 14px;
+      border-top: 1px solid var(--border);
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>Trinethra — Fellow Evaluation</h1>
+</header>
+
+<div class="workspace">
+
+  <div class="left-panel">
+    <div class="panel-label">Supervisor Transcript</div>
+    <textarea id="input"></textarea>
+    <div class="left-footer">
+      <button class="run-btn" onclick="analyze()">Run Analysis</button>
+    </div>
+  </div>
+
+  <div class="right-panel" id="result">
+    <div class="empty-state">Paste transcript → Run</div>
+  </div>
+
+</div>
+
 <script>
 async function analyze() {
   const transcript = document.getElementById('input').value;
-  if (!transcript.trim()) { alert('Paste a transcript first'); return; }
+  if (!transcript.trim()) return alert("Paste transcript");
 
-  const btn = document.getElementById('runBtn');
-  const status = document.getElementById('status');
-  btn.disabled = true;
-  status.innerHTML = '<span class="spinner"></span> Analyzing…';
+  const res = await fetch('http://localhost:3000/analyze', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ transcript })
+  });
 
-  try {
-    const res = await fetch('http://localhost:3000/analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ transcript })
-    });
-
-    const data = await res.json();
-    display(data);
-
-  } catch (err) {
-    document.getElementById('result').innerHTML =
-      '<div class="empty-state">Could not connect to backend</div>';
-  } finally {
-    btn.disabled = false;
-    status.textContent = '';
-  }
+  const data = await res.json();
+  display(data);
 }
 
 function display(data) {
   const container = document.getElementById('result');
 
   if (!data) {
-    container.innerHTML = '<div class="empty-state">Invalid response</div>';
+    container.innerHTML = "Invalid response";
     return;
   }
 
-  const v = Number(data.score?.value || data.score || 0);
-  const sc = v <= 4 ? 's-low' : v <= 6 ? 's-mid' : 's-high';
+  const score = data.score?.value || data.score || 0;
 
-  // Normalize
   const evidence = Array.isArray(data.evidence)
     ? data.evidence
     : (data.evidence ? [{ quote: data.evidence }] : []);
@@ -51,100 +183,42 @@ function display(data) {
     ? data.gaps
     : (data.gaps ? [{ gap: data.gaps }] : []);
 
-  const qs = Array.isArray(data.followUpQuestions)
-    ? data.followUpQuestions
-    : [];
+  const qs = data.followUpQuestions || [];
 
-  let h = `
-    <div class="score-block">
-      <div class="score-badge ${sc}">
-        <span class="num">${v}</span>
-        <span class="den">/ 10</span>
-      </div>
-      <div class="score-info">
-        <h2>${data.score?.label || ''}</h2>
-        <p>${data.score?.justification || ''}</p>
-      </div>
-    </div>`;
+  let html = `<div class="score-block">
+    <div class="score-badge s-mid">
+      <div class="num">${score}</div>
+      <div class="den">/10</div>
+    </div>
+  </div>`;
 
-  // Evidence
-  h += `<div class="section"><div class="sec-title">Evidence — accept or reject each finding</div>`;
-  if (!evidence.length) {
-    h += `<div class="ev-item"><div class="ev-interp">No evidence extracted</div></div>`;
-  } else {
-    evidence.forEach((e, i) => {
-      const q = e.quote || "No quote available";
-      const interp = e.interpretation || "No interpretation";
+  html += `<div class="section"><div class="sec-title">Evidence</div>`;
+  evidence.forEach(e => {
+    html += `<div class="ev-item">${e.quote || "No evidence"}</div>`;
+  });
+  html += `</div>`;
 
-      h += `<div class="ev-item" id="ev-${i}">
-        <div class="ev-quote">"${q}"</div>
-        <div class="ev-interp">${interp}</div>
-        <div class="ev-actions">
-          <button class="btn-a" onclick="mark(${i},'accepted')">Accept</button>
-          <button class="btn-r" onclick="mark(${i},'rejected')">Reject</button>
-        </div>
-      </div>`;
-    });
-  }
-  h += `</div>`;
+  html += `<div class="section"><div class="sec-title">KPI</div>`;
+  kpis.forEach(k => {
+    html += `<div class="kpi-item">${k.description || "No KPI"}</div>`;
+  });
+  html += `</div>`;
 
-  // KPI
-  h += `<div class="section"><div class="sec-title">KPI Mapping</div>`;
-  if (!kpis.length) {
-    h += `<div class="kpi-item"><span class="kpi-desc">No KPI mapping extracted</span></div>`;
-  } else {
-    kpis.forEach(k => {
-      const label = k.kpi || 'KPI';
-      const desc = k.description || "No details";
+  html += `<div class="section"><div class="sec-title">Gaps</div>`;
+  gaps.forEach(g => {
+    html += `<div class="gap-item">${g.gap || "No gap"}</div>`;
+  });
+  html += `</div>`;
 
-      h += `<div class="kpi-item">
-        <span class="kpi-tag">${label}</span>
-        <span class="kpi-desc">${desc}</span>
-      </div>`;
-    });
-  }
-  h += `</div>`;
+  html += `<div class="section"><div class="sec-title">Questions</div>`;
+  qs.forEach(q => {
+    html += `<div class="fq-item">${typeof q === 'string' ? q : q.question}</div>`;
+  });
+  html += `</div>`;
 
-  // Gaps
-  h += `<div class="section"><div class="sec-title">Gaps</div>`;
-  if (!gaps.length) {
-    h += `<div class="gap-item"><div class="gap-why">No gaps identified</div></div>`;
-  } else {
-    gaps.forEach(g => {
-      const name = g.gap || "Unknown";
-      const detail = g.importance || "No details";
-
-      h += `<div class="gap-item">
-        <div class="gap-name">${name}</div>
-        <div class="gap-why">${detail}</div>
-      </div>`;
-    });
-  }
-  h += `</div>`;
-
-  // Questions
-  h += `<div class="section"><div class="sec-title">Suggested Follow-up Questions</div>`;
-  if (!qs.length) {
-    h += `<div class="fq-item">No follow-up questions</div>`;
-  } else {
-    qs.forEach((q, i) => {
-      const txt = typeof q === 'string' ? q : (q.question || "No question");
-
-      h += `<div class="fq-item">
-        <span class="fq-num">Q${i + 1}</span>
-        <span>${txt}</span>
-      </div>`;
-    });
-  }
-  h += `</div>`;
-
-  container.innerHTML = h;
-}
-
-function mark(i, state) {
-  const el = document.getElementById(`ev-${i}`);
-  if (!el) return;
-  el.classList.remove('accepted', 'rejected');
-  el.classList.add(state);
+  container.innerHTML = html;
 }
 </script>
+
+</body>
+</html>
