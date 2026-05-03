@@ -90,7 +90,7 @@ Open `index.html` in your browser
 
 ---
 
-## 📊 Expected Behavior
+##  Expected Behavior
 
 | Fellow   | Expected Score |
 |----------|--------------|
@@ -100,7 +100,7 @@ Open `index.html` in your browser
 
 ---
 
-## ⚠️ Limitations
+##  Limitations
 
 - Local models may produce inconsistent JSON  
 - Output formatting may vary  
@@ -108,14 +108,14 @@ Open `index.html` in your browser
 
 ---
 
-## 🎯 Key Learning
+##  Key Learning
 
 Building with LLMs is not about perfect prompts.  
 It is about **handling imperfect outputs and enforcing rules consistently**.
 
 ---
 
-## 👤 Author
+##  Author
 
 Raksha  
-B.Tech, 3rd Year
+
