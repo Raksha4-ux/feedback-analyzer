@@ -4,7 +4,7 @@ Trinethra is a local AI-powered system that evaluates Fellows based on superviso
 
 ---
 
-## 🚀 Problem
+##   Problem
 
 Supervisor feedback is often:
 - Subjective and biased (helpfulness, presence)
@@ -16,7 +16,7 @@ This leads to inaccurate performance scoring.
 ---
 
 ## 💡 Solution
-
+ 
 Trinethra uses a locally running LLM (via Ollama) to:
 
 - Assign a performance score (1–10)
@@ -27,7 +27,7 @@ Trinethra uses a locally running LLM (via Ollama) to:
 
 ---
 
-## 🧠 Core Evaluation Framework
+##  Core Evaluation Framework
 
 The system evaluates across 4 dimensions:
 
@@ -38,7 +38,7 @@ The system evaluates across 4 dimensions:
 
 ---
 
-## ⚠️ Key Design Principle
+##  Key Design Principle
 
 > High impact does NOT mean high score.
 
@@ -46,7 +46,7 @@ If a Fellow’s work depends heavily on their personal involvement:
 - Personally handles tasks (calls, complaints, tracking)
 - Work would stop or slow down if they leave
 
-👉 Score is capped at **≤ 6**
+ Score is capped at **≤ 6**
 
 This prevents overrating task-heavy performers.
 
@@ -87,16 +87,6 @@ node server.js
 
 ### 4. Open frontend  
 Open `index.html` in your browser
-
----
-
-##  Expected Behavior
-
-| Fellow   | Expected Score |
-|----------|--------------|
-| Anil     | 5–6 |
-| Karthik  | 6–7 |
-| Meena    | 7 |
 
 ---
 
